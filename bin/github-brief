@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# github-brief — entrypoint / command dispatcher
+#
+#   github-brief <command> [args...]
+#   github-brief pr-brief daily
+#   github-brief pr-brief weekly
+#
+# Each command lives in commands/<name>/command.sh and is fully self-contained,
+# so adding a new automation never touches this file. See docs/ADDING_A_COMMAND.md
+set -euo pipefail
+
+GB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+usage() {
+  echo "usage: github-brief <command> [args...]"
+  echo
+  echo "available commands:"
+  for d in "$GB_ROOT"/commands/*/; do
+    [[ -f "$d/command.sh" ]] && echo "  - $(basename "$d")"
+  done
+  echo
+  echo "examples:"
+  echo "  github-brief pr-brief daily"
+  echo "  github-brief pr-brief weekly"
+}
+
+CMD="${1:-}"
+case "$CMD" in
+  ""|-h|--help|help) usage; exit 0 ;;
+esac
+shift
+
+RUNNER="$GB_ROOT/commands/$CMD/command.sh"
+if [[ ! -f "$RUNNER" ]]; then
+  echo "unknown command: $CMD" >&2
+  usage >&2
+  exit 2
+fi
+exec bash "$RUNNER" "$@"
