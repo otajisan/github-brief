@@ -1,5 +1,7 @@
 # github-brief
 
+**English** | [日本語](README.ja.md)
+
 Automated briefs of your GitHub repository activity, delivered to Slack and a
 local HTML page. Runs on your own machine via [Claude Code](https://claude.com/product/claude-code)
 + the [GitHub CLI](https://cli.github.com/) — no third-party server, no

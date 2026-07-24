@@ -1,5 +1,7 @@
 # Adding a new command
 
+**English** | [日本語](ADDING_A_COMMAND.ja.md)
+
 A "command" is a self-contained automation under `commands/<name>/`. Adding one
 never requires editing `bin/github-brief` or existing commands.
 

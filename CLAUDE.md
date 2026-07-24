@@ -155,3 +155,11 @@ is rejected.
 - Run `shellcheck` on all shell scripts before pushing.
 - New config keys: add to `config.example.sh` with a safe placeholder,
   document in README, and validate presence in `gb::load_config` if required.
+
+## Documentation languages
+
+User-facing docs are bilingual: English is canonical (`README.md`,
+`CONTRIBUTING.md`, `docs/*.md`), each with a Japanese counterpart (`*.ja.md`)
+linked from a language-switcher line at the top. When editing any of these
+docs, apply the same change to the other language version in the same commit.
+`CLAUDE.md` and prompt templates are exempt (English / as-is).

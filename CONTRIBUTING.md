@@ -1,5 +1,7 @@
 # Contributing
 
+**English** | [日本語](CONTRIBUTING.ja.md)
+
 Thanks for your interest in improving github-brief.
 
 ## Getting set up

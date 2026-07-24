@@ -1,5 +1,7 @@
 # Architecture
 
+**English** | [日本語](ARCHITECTURE.ja.md)
+
 `github-brief` is a small, extensible harness for automating summaries of
 GitHub repository activity. The first bundled automation is `pr-brief`, but the
 structure is designed so that new automations are additive.
