@@ -1,0 +1,15 @@
+# Local configuration (contains repo names, webhook URLs, etc.) — never commit
+config.local.sh
+
+# Generated output (HTML, Slack payloads, logs)
+out/
+*.log
+
+# Generated launchd plists
+*.generated.plist
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
