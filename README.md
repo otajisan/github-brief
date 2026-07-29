@@ -14,16 +14,24 @@ The first bundled automation is **pr-brief**:
   merged into your base branch since the previous day — each with a one-line
   summary of what it changes.
 - **Weekly (e.g. Friday):** everything released and newly opened over the past
-  week, with auto-generated highlights you can paste into a progress report.
+  week, with auto-generated highlights you can paste into a progress report,
+  plus charts of the release week (releases per day, type breakdown, per repo,
+  per author) and a comparison against the previous period.
+
+Every run is archived, and `index.html` is a **history hub**: the latest weekly
+and daily brief up front, then the full archive. Each page carries a nav bar, so
+in a weekly meeting you can open the weekly summary and jump straight into the
+daily briefs of that same week when someone asks for detail.
 
 It supports **one or many repositories** and is built as a small harness so you
 can add more activity automations over time (see
 [docs/ADDING_A_COMMAND.md](docs/ADDING_A_COMMAND.md)).
 
 > Why a harness and not one script? See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-> In short: deterministic work (dates, `gh` queries, Slack) stays in shell;
-> only summarizing and HTML rendering are delegated to the model, under a strict
-> read-only, cost-bounded configuration.
+> In short: deterministic work (dates, `gh` queries, aggregation, every number,
+> the charts, Slack) stays in shell; only summarizing and the surrounding page
+> are delegated to the model, under a strict read-only, cost-bounded
+> configuration.
 
 ## Requirements
 
@@ -47,7 +55,7 @@ chmod +x bin/github-brief scripts/*.sh
 ./bin/github-brief pr-brief daily
 ./bin/github-brief pr-brief weekly
 
-# view the HTML
+# view the HTML (index.html = history hub: latest + archive)
 ./scripts/serve.sh               # http://localhost:8787/index.html
 
 # schedule it (weekday 09:00 daily, Friday 10:30 weekly by default)
@@ -73,8 +81,28 @@ settings:
 | `SLACK_WEBHOOK_URL` | Incoming webhook; empty = HTML only |
 | `OUTPUT_DIR` | Where HTML/logs go (outside the repo) |
 | `MODEL` / `MAX_TURNS` | Model and per-run cost ceiling |
+| `RUN_TIMEOUT_SECONDS` | Wall-clock ceiling; a hung run is killed and reported to Slack (default 3600) |
 | `TZ_OFFSET_HOURS` | Timezone for windows (JST = 9) |
 | `DAILY_*` / `WEEKLY_*` | Schedule + weekly window bounds |
+| `GH_LIMIT` | Max PRs fetched per `gh` query (default 200) |
+| `BODY_MAX_CHARS` | PR body truncation before the model sees it (default 1200) |
+
+## Browsing history
+
+`OUTPUT_DIR` accumulates one page per run, named
+`pr-brief-<mode>-<YYYYMMDD>.html`, and `index.html` is regenerated as a hub
+listing all of them (with release/review counts per entry). Alongside each page
+sit `.metrics.json` and `.meta.json` sidecars — the aggregated numbers that both
+the charts and the hub are built from.
+
+Navigation between pages is injected automatically on every run, so an older
+page also links forward to newer ones:
+
+- **← 履歴一覧** back to the hub
+- **前の/次の週次・日次** the neighbouring page of the same kind
+- on a weekly page, **この期間の日次ブリーフ** — one chip per daily brief inside
+  that week's window (the drill-down path for a meeting question)
+- on a daily page, **この日を含む週次サマリ**
 
 ### Changing or adding repositories
 

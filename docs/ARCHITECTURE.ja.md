@@ -13,10 +13,14 @@
 分割しています:
 
 - **決定的な処理はシェルに残す。** 時間ウィンドウの計算、`gh` の検索クエリ、
-  ファイルの書き出し・配信、Slack への投稿は、正確で再現可能でなければならない
-  固定ロジックです。これらは `lib/common.sh` にあります。
-- **曖昧な処理は Claude に委譲する。**「この PR は何を変えるのか」の要約と、
-  読みやすい HTML ページのレンダリングだけがモデルに渡されるステップです。
+  JSON の集計、出力に現れるすべての数値、グラフのマークアップ、ファイルの
+  書き出し・配信、Slack への投稿は、正確で再現可能でなければならない固定
+  ロジックです。これらは `lib/common.sh` と、そこから呼ばれる `lib/*.py` に
+  あります。
+- **曖昧な処理は Claude に委譲する。**「この PR は何を変えるのか」の要約、
+  週をハイライトへまとめる作業、事前生成ブロックの周りのページ生成だけが
+  モデルに渡されるステップです。モデルには取得済みの JSON バンドルを渡すので、
+  一覧のために GitHub へ問い合わせることはなく、自分で数を数えることもありません。
 - **実行の上限。** すべての Claude 実行は `--max-turns`(設定 `MAX_TURNS`)で
   上限が設けられ、コストを抑え、暴走ループを防ぎます。
 - **シークレットの隔離。** Slack の Webhook URL はモデルのプロンプトに決して
@@ -29,7 +33,11 @@
 ```
 github-brief/
 ├── bin/github-brief         # エントリポイント: commands/<name>/command.sh へディスパッチ
-├── lib/common.sh            # 共有 gb::* ヘルパー(設定、ウィンドウ、claude、slack)
+├── lib/
+│   ├── common.sh            # 共有 gb::* ヘルパー(設定、ウィンドウ、gh、claude、slack)
+│   ├── collect_prs.py       # gh JSON -> bundle + metrics + .meta.json(すべての数値)
+│   ├── render_charts.py     # metrics -> KPI/グラフ HTML 断片(CSS マーク、自己完結)
+│   └── build_site.py        # index.html 履歴ハブ・ナビ注入・グラフ差し込み
 ├── commands/                # 自動化ごとに1ディレクトリ(プラグイン風)
 │   └── pr-brief/
 │       ├── command.sh       # 実装: github-brief pr-brief {daily|weekly}
@@ -53,20 +61,38 @@ launchd ──> bin/github-brief <command> <mode>
                 │
                 ▼
         commands/<command>/command.sh
-                │  gb::load_config        (config.local.sh)
-                │  gb::iso_window <mode>   (決定的な SINCE..UNTIL)
-                │  gb::render prompt       (@@KEY@@ 置換、REPOS を含む)
+                │  gb::load_config         (config.local.sh)
+                │  gb::iso_window <mode>    (決定的な SINCE..UNTIL)
+                │  gb::fetch_prs  × repo    (gh pr list --json; クエリはシェル側)
+                │  gb::collect_prs          (bundle.json + metrics.json + .meta.json)
+                │  gb::render_charts        (weekly: KPI + グラフ断片)
+                │  gb::render prompt        (@@KEY@@ 置換、バンドルのパスを含む)
                 ▼
         gb::run_claude ─────────────────────────────► Claude Code (ヘッドレス)
-                                                        ├─ gh pr list (リポジトリごと)
+                                                        ├─ bundle.json を Read
                                                         ├─ 各 PR を要約
                                                         └─ HTML + Slack 本文を Write
                 │
-                │  gb::update_index  (HTML を index.html にコピー)
-                │  gb::post_slack    (シェルのみ; Webhook はプロンプトに出さない)
+                │  gb::inject_charts   (<!-- gb:charts --> にグラフブロックを差し込む)
+                │  gb::rebuild_site    (index.html ハブ + 全アーカイブのナビ更新)
+                │  gb::post_slack      (シェルのみ; Webhook はプロンプトに出さない)
                 ▼
-        out/ : *.html, index.html, slack-*.txt, logs/
+        OUTPUT_DIR/
+          pr-brief-<mode>-<YYYYMMDD>.html        ブリーフ本体(アーカイブ; 上書きしない)
+          pr-brief-<mode>-<YYYYMMDD>.meta.json   ウィンドウ + 件数(ハブが読む)
+          pr-brief-<mode>-<YYYYMMDD>.metrics.json 集計値(前期比の基準にもなる)
+          pr-brief-<mode>-<YYYYMMDD>.bundle.json モデルに渡す PR データ
+          index.html                             再生成される履歴ハブ
+          slack-*.txt, logs/
 ```
+
+## 数値とグラフを事前生成する理由
+
+要約と集計を同時に頼むと、LLM はときどき計算を間違えます。手で描いたグラフは、
+もっともらしく見えたまま値を誤って表現してしまうこともあります。そのため件数・
+日別バケット・種別内訳・グラフのマークアップは `lib/collect_prs.py` /
+`lib/render_charts.py` で計算し、プロンプトにはそれを正解として扱わせています。
+モデルに残る仕事は「その PR が何を変えるのか」を書くこと — 本当に得意な部分だけです。
 
 ## 設定とプライバシー
 

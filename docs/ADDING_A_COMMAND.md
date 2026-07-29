@@ -32,6 +32,7 @@ source "$GB_ROOT/lib/common.sh"
 gb::load_config
 
 export GB_LOG="$OUTPUT_DIR/logs/stale-prs-$(date +%Y%m%d-%H%M%S).log"
+gb::guard_runtime          # a hang must fail loudly, not wedge the schedule
 
 HTML_OUT="$OUTPUT_DIR/stale-prs-$(date +%Y%m%d).html"
 SLACK_TXT="$OUTPUT_DIR/slack-stale-prs-$(date +%Y%m%d).txt"
@@ -40,7 +41,7 @@ PROMPT="$(gb::render "$CMD_DIR/prompts/default.md" \
   "REPOS=$(gb::repos_lines)" "HTML_OUT=$HTML_OUT" "SLACK_TXT=$SLACK_TXT" "PORT=$SERVE_PORT")"
 
 if gb::run_claude "$PROMPT" >>"$GB_LOG" 2>&1; then
-  gb::update_index "$HTML_OUT"
+  gb::rebuild_site            # index.html hub + nav on every archived page
   gb::post_slack "$SLACK_TXT"
 else
   gb::notify_failure "github-brief stale-prs failed. log: $GB_LOG"
@@ -60,13 +61,29 @@ github-brief stale-prs
 |---|---|
 | `gb::load_config` | Source `config.local.sh`, ensure `OUTPUT_DIR` exists |
 | `gb::log "msg"` | Timestamped log to `$GB_LOG` (stderr) |
+| `gb::guard_runtime [sec]` | Watchdog: kill + Slack-warn a run that hangs (`RUN_TIMEOUT_SECONDS`) |
 | `gb::repos_lines` | Print configured repos, one per line |
 | `gb::iso_window daily\|weekly` | Deterministic `SINCE UNTIL` (ISO8601 + tz) |
+| `gb::window_label since until` | Human-facing window (`2026/07/22 14:30 〜 07/29 10:30`) |
+| `gb::fetch_prs repo out.json …` | `gh pr list --json …` dump (extra args passed through) |
+| `gb::collect_prs …` | Merge dumps → `bundle.json` + `metrics.json` + `.meta.json` |
+| `gb::render_charts metrics out` | Pre-rendered KPI + chart fragment |
+| `gb::prev_metrics mode current` | Newest earlier metrics file (previous-period delta) |
 | `gb::render tpl KEY=VAL…` | Replace `@@KEY@@` in a prompt template |
 | `gb::run_claude "prompt"` | Headless Claude run (read-only gh + Write, bounded) |
-| `gb::update_index html` | Copy an HTML file to `index.html` |
+| `gb::inject_charts html frag` | Splice a chart block into `<!-- gb:charts -->` |
+| `gb::rebuild_site` | Rebuild the `index.html` hub + nav on archived pages |
 | `gb::post_slack txt` | Post a text file to the Slack webhook (no-op if unset) |
 | `gb::notify_failure "msg"` | Send a warning to Slack |
+
+### Appearing in the history hub
+
+`lib/build_site.py` currently indexes pages named
+`pr-brief-<daily|weekly>-<YYYYMMDD>.html` with a sibling `<same-stem>.meta.json`
+(written by `gb::collect_prs --out-meta`). A new command's pages show up in the
+hub once you extend `NAME_RE` / `MODE_JA` in `lib/build_site.py` to know about
+it; until then, link to your page from your own Slack body. Keep one archived
+file per run — never overwrite yesterday's page.
 
 ## 3. (Optional) schedule it
 
