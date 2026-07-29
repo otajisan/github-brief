@@ -16,7 +16,7 @@ mkdir -p "$AGENTS" "$OUTPUT_DIR/logs"
 export GB_BIN="$GB_ROOT/bin/github-brief"
 export GB_OUT="$OUTPUT_DIR"
 # launchd GUI jobs get a minimal PATH; include where claude/gh/python3 live.
-export GB_PATH_ENV="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export GB_PATH_ENV="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 python3 "$GB_ROOT/scripts/gen_plists.py" "$AGENTS"
 
