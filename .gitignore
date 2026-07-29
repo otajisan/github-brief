@@ -8,6 +8,10 @@ out/
 # Generated launchd plists
 *.generated.plist
 
+# Python bytecode (lib/*.py, scripts/*.py)
+__pycache__/
+*.pyc
+
 # OS / editor
 .DS_Store
 *.swp

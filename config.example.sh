@@ -34,9 +34,14 @@ export SERVE_PORT="8787"
 
 # --- Claude Code ------------------------------------------------------------
 export MODEL="claude-sonnet-5"     # cost-first: claude-haiku-4-5 / quality: claude-opus-4-8
-export MAX_TURNS="30"              # Bounded Execution: per-run ceiling
+export MAX_TURNS="30"              # Bounded Execution: per-run cost ceiling
+export RUN_TIMEOUT_SECONDS="3600"  # wall-clock ceiling; a hung run is killed + Slack-warned
 export CLAUDE_BIN="claude"
 export GH_BIN="gh"
+
+# --- Data collection (optional; defaults are built in) ----------------------
+export GH_LIMIT="200"              # max PRs fetched per gh query
+export BODY_MAX_CHARS="1200"       # PR body truncated to this before the model sees it
 
 # --- Time windows -----------------------------------------------------------
 export TZ_OFFSET_HOURS="9"         # JST = 9
