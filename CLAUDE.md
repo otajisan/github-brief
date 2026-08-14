@@ -104,9 +104,12 @@ Full walkthrough: `docs/ADDING_A_COMMAND.md`. Summary:
    rendering). It is immediately runnable as `github-brief <name>` — no
    dispatcher changes.
 2. `command.sh` skeleton: source `lib/common.sh`, `gb::load_config`, set
-   `GB_LOG`, arm `gb::guard_runtime` (a hang must fail loudly — an unbounded run
-   keeps launchd's job in "running" state and silently skips every later
-   schedule), compute output paths under `$OUTPUT_DIR`, fetch data with
+   `GB_LOG` + `GB_FAILURE_CONTEXT`, arm `gb::guard_runtime` (a hang must fail
+   loudly — an unbounded run keeps launchd's job in "running" state and silently
+   skips every later schedule; the same call arms the EXIT trap so a *fast*
+   death is just as loud), gate on `gb::wait_for_network` (launchd fires a
+   missed job on wake, before Wi-Fi is back), compute output paths under
+   `$OUTPUT_DIR`, fetch data with
    `gb::fetch_prs` + aggregate with `gb::collect_prs` (never in a prompt),
    render the prompt with `gb::render`, run `gb::run_claude`, then
    `gb::rebuild_site` + `gb::post_slack`; on failure `gb::notify_failure` and
@@ -121,11 +124,12 @@ Available helpers (`lib/common.sh`):
 |---|---|
 | `gb::load_config` | Source `config.local.sh`, ensure `OUTPUT_DIR` exists |
 | `gb::log "msg"` | Timestamped log to `$GB_LOG` (stderr) |
-| `gb::guard_runtime [sec]` | Watchdog: kill + Slack-warn a run that hangs (`RUN_TIMEOUT_SECONDS`) |
+| `gb::guard_runtime [sec]` | Watchdog: kill + Slack-warn a run that hangs (`RUN_TIMEOUT_SECONDS`); also arms the EXIT trap that Slack-warns any non-zero exit |
+| `gb::wait_for_network [sec]` | Block until `api.github.com` answers (`NETWORK_WAIT_SECONDS`); 1 if it never does |
 | `gb::repos_lines` | Print configured repos, one per line |
 | `gb::iso_window daily\|weekly` | Deterministic `SINCE UNTIL` (ISO8601 + tz offset) |
 | `gb::window_label since until` | Human-facing window (`2026/07/22 14:30 〜 07/29 10:30`) |
-| `gb::fetch_prs repo out.json …` | `gh pr list --json …` dump (queries stay in shell) |
+| `gb::fetch_prs repo out.json …` | `gh pr list --json …` dump (queries stay in shell); retried (`GH_RETRIES`), written atomically |
 | `gb::collect_prs …` | Merge dumps → `bundle.json` + `metrics.json` + `.meta.json` |
 | `gb::render_charts metrics out` | Pre-rendered KPI + chart fragment (weekly) |
 | `gb::prev_metrics mode current` | Newest earlier metrics file, for the 前期比 delta |

@@ -86,6 +86,8 @@ settings:
 | `DAILY_*` / `WEEKLY_*` | Schedule + weekly window bounds |
 | `GH_LIMIT` | Max PRs fetched per `gh` query (default 200) |
 | `BODY_MAX_CHARS` | PR body truncation before the model sees it (default 1200) |
+| `NETWORK_WAIT_SECONDS` | How long a run waits for `api.github.com` before aborting (default 180) |
+| `GH_RETRIES` | Attempts per `gh` query before the run fails (default 3) |
 
 ## Browsing history
 

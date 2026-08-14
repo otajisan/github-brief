@@ -27,11 +27,22 @@ fi
 STAMP="$(date +%Y%m%d-%H%M%S)"
 DATE_TAG="$(date +%Y%m%d)"
 export GB_LOG="$OUTPUT_DIR/logs/pr-brief-${MODE}-${STAMP}.log"
+export GB_FAILURE_CONTEXT="github-brief pr-brief ($MODE)"   # read by gb::_on_exit
 gb::guard_runtime          # a hang must fail loudly, not wedge the schedule
+                           # (and gb::_on_exit makes a fast death just as loud)
 
 read -r SINCE UNTIL <<<"$(gb::iso_window "$MODE")"
 gb::log "pr-brief $MODE  window: $SINCE .. $UNTIL"
 gb::log "repos: ${REPOS[*]}"
+
+# --- 0. connectivity --------------------------------------------------------
+# The schedule and the Mac's sleep cycle are unrelated: launchd fires a missed
+# job on wake, and this point is reached before Wi-Fi is back. Wait for the API
+# instead of losing the brief on the first query.
+if ! gb::wait_for_network; then
+  gb::notify_failure "github-brief pr-brief ($MODE): api.github.com unreachable after ${NETWORK_WAIT_SECONDS:-180}s — run aborted before fetching. log: $GB_LOG"
+  exit 1
+fi
 
 BASE_NAME="pr-brief-${MODE}-${DATE_TAG}"
 HTML_OUT="$OUTPUT_DIR/${BASE_NAME}.html"

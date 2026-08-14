@@ -41,6 +41,12 @@ gb::log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "${GB_LOG:-/dev/null}" >&2 ; 
 gb::guard_runtime() {
   local limit="${1:-${RUN_TIMEOUT_SECONDS:-3600}}"
   local target=$$
+  # Marker for "this failure was already reported". A file rather than a
+  # variable because the watchdog below runs in a subshell; it sees the same
+  # $$, so both sides agree on the path.
+  GB_NOTIFY_MARKER="${TMPDIR:-/tmp}/github-brief-notified.$$"
+  export GB_NOTIFY_MARKER
+  rm -f "$GB_NOTIFY_MARKER"
   (
     waited=0
     while [[ "$waited" -lt "$limit" ]]; do
@@ -67,13 +73,31 @@ gb::guard_runtime() {
     fi
   ) &
   GB_WATCHDOG_PID=$!
-  trap 'gb::disarm_runtime' EXIT
+  trap 'gb::_on_exit' EXIT
 }
 
 gb::disarm_runtime() {
   [[ -n "${GB_WATCHDOG_PID:-}" ]] || return 0
   kill "$GB_WATCHDOG_PID" 2>/dev/null || true
   GB_WATCHDOG_PID=""
+}
+
+# gb::_on_exit   (EXIT trap installed by gb::guard_runtime — not called directly)
+# The watchdog above only catches hangs. This catches the opposite failure: a
+# step that dies fast. Under `set -e` everything before the Claude call — the
+# gh fetch, the aggregation, the charts — aborted the run with no log line and
+# no Slack warning, so a failed brief looked exactly like a brief nobody had
+# read yet. Report any non-zero exit that nothing else has reported.
+gb::_on_exit() {
+  local rc=$?
+  gb::disarm_runtime
+  if [[ "$rc" -ne 0 && ! -f "${GB_NOTIFY_MARKER:-/nonexistent}" ]]; then
+    gb::log "ERROR: ${GB_FAILURE_CONTEXT:-github-brief} exited $rc"
+    gb::notify_failure \
+      "${GB_FAILURE_CONTEXT:-github-brief}: failed with exit $rc (log: ${GB_LOG:-n/a})"
+  fi
+  [[ -n "${GB_NOTIFY_MARKER:-}" ]] && rm -f "$GB_NOTIFY_MARKER"
+  return 0
 }
 
 # --- repos ------------------------------------------------------------------
@@ -101,11 +125,56 @@ gb::window_label() {
 # PR straight from the bundle without spending a turn on `gh pr view`.
 GB_PR_FIELDS="number,title,url,author,createdAt,updatedAt,mergedAt,state,isDraft,additions,deletions,changedFiles,labels,body"
 
+# gb::wait_for_network [max_seconds]   (default NETWORK_WAIT_SECONDS, else 180)
+# launchd fires a missed job the moment the Mac wakes, which is routinely before
+# Wi-Fi is back — the first gh call then dies with "error connecting to
+# api.github.com" and that day's brief is simply lost. Wait for the API instead.
+# The probe is `gh api rate_limit`: it exercises DNS, TLS and auth in one call,
+# and that endpoint is itself exempt from the rate limit.
+gb::wait_for_network() {
+  local limit="${1:-${NETWORK_WAIT_SECONDS:-180}}"
+  local waited=0 delay=5
+  while :; do
+    if "${GH_BIN:-gh}" api rate_limit --silent >/dev/null 2>&1; then
+      if [[ "$waited" -gt 0 ]]; then
+        gb::log "network: api.github.com reachable after ${waited}s"
+      fi
+      return 0
+    fi
+    if [[ "$waited" -ge "$limit" ]]; then
+      gb::log "network: api.github.com still unreachable after ${waited}s"
+      return 1
+    fi
+    gb::log "network: api.github.com unreachable, retry in ${delay}s (${waited}/${limit}s)"
+    sleep "$delay"
+    waited=$((waited + delay))
+    if [[ "$delay" -lt 30 ]]; then delay=$((delay * 2)); fi
+  done
+}
+
 # gb::fetch_prs <repo> <out.json> [extra gh args…]
+# Retried: once the schedule is unattended, a single dropped packet must not
+# cost the whole brief. Writes through a .part file so a failed attempt cannot
+# leave a truncated (or empty) .json behind for a later step to read as valid.
 gb::fetch_prs() {
   local repo="$1" out="$2"; shift 2
-  "${GH_BIN:-gh}" pr list --repo "$repo" \
-    --json "$GB_PR_FIELDS" --limit "${GH_LIMIT:-200}" "$@" >"$out"
+  local attempts="${GH_RETRIES:-3}" try=1 delay=5
+  while :; do
+    if "${GH_BIN:-gh}" pr list --repo "$repo" \
+        --json "$GB_PR_FIELDS" --limit "${GH_LIMIT:-200}" "$@" >"$out.part"; then
+      mv "$out.part" "$out"
+      return 0
+    fi
+    rm -f "$out.part"
+    if [[ "$try" -ge "$attempts" ]]; then
+      gb::log "fetch: $repo failed after ${attempts} attempt(s)"
+      return 1
+    fi
+    gb::log "fetch: $repo failed (attempt ${try}/${attempts}), retry in ${delay}s"
+    sleep "$delay"
+    try=$((try + 1))
+    delay=$((delay * 2))
+  done
 }
 
 # gb::collect_prs [args…]   -> bundle.json + metrics.json + meta.json
@@ -188,8 +257,19 @@ PY
   fi
 }
 
+# gb::notify_failure "<message>"
+# The single place a warning is sent. Drops the marker first so gb::_on_exit
+# does not send a second warning for the same failure — including when the
+# watchdog reports from its subshell and then kills this run. The body goes
+# through python3 rather than string interpolation so a message containing a
+# quote or a newline cannot produce invalid JSON and silently post nothing.
 gb::notify_failure() {
-  [[ -z "${SLACK_WEBHOOK_URL:-}" ]] && return 0
+  if [[ -n "${GB_NOTIFY_MARKER:-}" ]]; then
+    : >"$GB_NOTIFY_MARKER" 2>/dev/null || true
+  fi
+  [[ -n "${SLACK_WEBHOOK_URL:-}" ]] || return 0
+  local payload
+  payload="$(python3 -c 'import json,sys; print(json.dumps({"text": ":warning: " + sys.argv[1]}, ensure_ascii=False))' "$1")" || return 0
   curl -s -X POST -H 'Content-type: application/json' \
-    --data "{\"text\":\":warning: $1\"}" "$SLACK_WEBHOOK_URL" >/dev/null || true
+    --data "$payload" "$SLACK_WEBHOOK_URL" >/dev/null || true
 }

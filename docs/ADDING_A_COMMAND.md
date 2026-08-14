@@ -61,11 +61,12 @@ github-brief stale-prs
 |---|---|
 | `gb::load_config` | Source `config.local.sh`, ensure `OUTPUT_DIR` exists |
 | `gb::log "msg"` | Timestamped log to `$GB_LOG` (stderr) |
-| `gb::guard_runtime [sec]` | Watchdog: kill + Slack-warn a run that hangs (`RUN_TIMEOUT_SECONDS`) |
+| `gb::guard_runtime [sec]` | Watchdog: kill + Slack-warn a run that hangs (`RUN_TIMEOUT_SECONDS`). Also arms the EXIT trap that Slack-warns any non-zero exit |
+| `gb::wait_for_network [sec]` | Block until `api.github.com` answers (`NETWORK_WAIT_SECONDS`); returns 1 if it never does |
 | `gb::repos_lines` | Print configured repos, one per line |
 | `gb::iso_window daily\|weekly` | Deterministic `SINCE UNTIL` (ISO8601 + tz) |
 | `gb::window_label since until` | Human-facing window (`2026/07/22 14:30 〜 07/29 10:30`) |
-| `gb::fetch_prs repo out.json …` | `gh pr list --json …` dump (extra args passed through) |
+| `gb::fetch_prs repo out.json …` | `gh pr list --json …` dump, retried (`GH_RETRIES`), written atomically |
 | `gb::collect_prs …` | Merge dumps → `bundle.json` + `metrics.json` + `.meta.json` |
 | `gb::render_charts metrics out` | Pre-rendered KPI + chart fragment |
 | `gb::prev_metrics mode current` | Newest earlier metrics file (previous-period delta) |
