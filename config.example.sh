@@ -43,6 +43,12 @@ export GH_BIN="gh"
 export GH_LIMIT="200"              # max PRs fetched per gh query
 export BODY_MAX_CHARS="1200"       # PR body truncated to this before the model sees it
 
+# --- Resilience (a scheduled run must survive a sleeping Mac) ---------------
+# launchd fires a missed job the moment the Mac wakes — often before Wi-Fi is
+# back. The run waits for api.github.com instead of dying on the first query.
+export NETWORK_WAIT_SECONDS="180"  # wait this long for api.github.com before aborting
+export GH_RETRIES="3"              # attempts per gh query before the run fails
+
 # --- Time windows -----------------------------------------------------------
 export TZ_OFFSET_HOURS="9"         # JST = 9
 

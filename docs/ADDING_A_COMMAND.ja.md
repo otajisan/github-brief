@@ -61,11 +61,12 @@ github-brief stale-prs
 |---|---|
 | `gb::load_config` | `config.local.sh` を読み込み、`OUTPUT_DIR` の存在を保証 |
 | `gb::log "msg"` | `$GB_LOG` へのタイムスタンプ付きログ(stderr) |
-| `gb::guard_runtime [秒]` | 見張り: ハングした実行を停止し Slack へ警告(`RUN_TIMEOUT_SECONDS`) |
+| `gb::guard_runtime [秒]` | 見張り: ハングした実行を停止し Slack へ警告(`RUN_TIMEOUT_SECONDS`)。非ゼロ終了も EXIT トラップで Slack 警告 |
+| `gb::wait_for_network [秒]` | `api.github.com` が応答するまで待機(`NETWORK_WAIT_SECONDS`)。最後まで不通なら 1 を返す |
 | `gb::repos_lines` | 設定済みリポジトリを1行1件で出力 |
 | `gb::iso_window daily\|weekly` | 決定的な `SINCE UNTIL`(ISO8601 + タイムゾーン) |
 | `gb::window_label since until` | 人間向けの期間表記(`2026/07/22 14:30 〜 07/29 10:30`) |
-| `gb::fetch_prs repo out.json …` | `gh pr list --json …` のダンプ(追加引数はそのまま渡る) |
+| `gb::fetch_prs repo out.json …` | `gh pr list --json …` のダンプ。リトライ付き(`GH_RETRIES`)・原子的書き込み |
 | `gb::collect_prs …` | ダンプを統合 → `bundle.json` + `metrics.json` + `.meta.json` |
 | `gb::render_charts metrics out` | KPI + グラフ断片を事前生成 |
 | `gb::prev_metrics mode current` | 直前の metrics ファイル(前期比の基準) |

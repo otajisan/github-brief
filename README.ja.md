@@ -84,6 +84,8 @@ launchctl kickstart -k gui/$(id -u)/com.github-brief.daily
 | `DAILY_*` / `WEEKLY_*` | スケジュールとウィークリーの集計範囲 |
 | `GH_LIMIT` | `gh` クエリ1回あたりの最大取得件数(既定 200) |
 | `BODY_MAX_CHARS` | モデルに渡す前に PR 本文を切り詰める文字数(既定 1200) |
+| `NETWORK_WAIT_SECONDS` | `api.github.com` の応答を待つ上限。超えたら実行を中止(既定 180) |
+| `GH_RETRIES` | `gh` クエリ1回あたりの試行回数。使い切ると実行を失敗させる(既定 3) |
 
 ## 履歴を辿る
 
