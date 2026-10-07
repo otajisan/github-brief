@@ -78,6 +78,7 @@ launchctl kickstart -k gui/$(id -u)/com.github-brief.daily
 | `REVIEW_FILTER` | `review-requested:@me` または `team-review-requested:ORG/TEAM` |
 | `SLACK_WEBHOOK_URL` | Incoming Webhook。空なら HTML のみ |
 | `OUTPUT_DIR` | HTML / ログの出力先(リポジトリ外) |
+| `SERVE_PORT` / `SERVE_AT_LOGIN` | 履歴ハブのポート。`1` ならログイン時から常駐させる(後述) |
 | `MODEL` / `MAX_TURNS` | 使用モデルと1実行あたりのコスト上限 |
 | `RUN_TIMEOUT_SECONDS` | 実時間の上限。ハングした実行を停止し Slack へ警告(既定 3600) |
 | `TZ_OFFSET_HOURS` | 集計ウィンドウのタイムゾーン(JST = 9) |
@@ -123,6 +124,14 @@ launchctl kickstart -k gui/$(id -u)/com.github-brief.daily
 で動くため、生成されるジョブは一般的な Homebrew / システムのパスを `PATH` に
 設定します。`claude`・`gh`・`python3` が別の場所にある場合は
 `scripts/install.sh` の `GB_PATH_ENV` を調整してください。
+
+`SERVE_AT_LOGIN="1"` のとき、install は `com.github-brief.serve` も登録します。
+ログイン時に `scripts/serve.sh` を起動し、終了しても再起動するので、再起動後も
+`http://localhost:SERVE_PORT/` をそのまま開けます。待ち受けは `127.0.0.1` のみです。
+`0` にして `install.sh` を再実行すると登録が外れます。
+
+Slack Webhook が投稿を拒否した場合(URL の失効、メッセージ過大など)は、
+`slack: send failed (HTTP <code>: <理由>)` をログに残し、警告を送ります。
 
 アンインストール:
 
