@@ -68,6 +68,9 @@ def build_serve():
         **_base(SERVE_LABEL, ["/bin/bash", serve_sh]),
         "RunAtLoad": True,
         "KeepAlive": True,
+        # A server that dies at once (port taken) is retried once a minute, not
+        # launchd's default every 10s.
+        "ThrottleInterval": 60,
     }
 
 
