@@ -121,10 +121,12 @@ if gb::run_claude "$PROMPT" >>"$GB_LOG" 2>&1; then
     gb::inject_charts "$HTML_OUT" "$CHARTS"
   fi
   gb::rebuild_site
-  gb::post_slack "$SLACK_TXT"
+  slack_ok=1
+  gb::post_slack "$SLACK_TXT" || slack_ok=0   # already logged + warned
   rm -rf "$TMP_DIR"
   gb::log "done: $HTML_OUT"
   gb::log "index: $OUTPUT_DIR/index.html"
+  [[ "$slack_ok" == 1 ]] || exit 1
 else
   gb::log "ERROR: claude failed (see $GB_LOG)"
   gb::notify_failure "github-brief pr-brief ($MODE) failed. log: $GB_LOG"
