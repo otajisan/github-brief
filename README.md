@@ -68,6 +68,17 @@ Run a scheduled job immediately to test:
 launchctl kickstart -k gui/$(id -u)/com.github-brief.daily
 ```
 
+Backfill a day whose scheduled run failed (e.g. on a Claude usage limit) by
+running it as of that date — the window, file names and Slack title follow
+`GB_AS_OF`, and the 前期比 delta is taken from the brief before it:
+
+```bash
+GB_AS_OF=2026-01-20 ./bin/github-brief pr-brief daily
+```
+
+The review queue is always the current one: GitHub has no history of who was
+asked to review what on a past day.
+
 ## Configuration
 
 Everything environment-specific lives in `config.local.sh` (gitignored). Key

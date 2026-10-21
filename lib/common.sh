@@ -111,7 +111,7 @@ gb::repos_lines() { printf '%s\n' "${REPOS[@]}"; }
 gb::iso_window() {
   python3 "$GB_ROOT/lib/iso_window.py" "$1" "$TZ_OFFSET_HOURS" \
     "${WEEKLY_LOOKBACK_DAYS:-7}" "${WEEKLY_HOUR:-10}" "${WEEKLY_MINUTE:-30}" \
-    "${WEEKLY_START_HOUR:-14}" "${WEEKLY_START_MINUTE:-30}"
+    "${WEEKLY_START_HOUR:-14}" "${WEEKLY_START_MINUTE:-30}" "${GB_AS_OF:-}"
 }
 
 # gb::window_label <since> <until>  ->  "2026/07/22 14:30 〜 07/29 10:30"
@@ -187,11 +187,13 @@ gb::render_charts() {
 
 # gb::prev_metrics <mode> <current.metrics.json>  -> newest earlier metrics file
 # Feeds the "前期比" delta; prints nothing when there is no history yet.
+# "Earlier" is by date tag in the name, so a backfilled brief (GB_AS_OF) is
+# compared with the day before it, not with a newer brief already on disk.
 gb::prev_metrics() {
   local mode="$1" current="$2" i
   local files=("$OUTPUT_DIR"/pr-brief-"$mode"-*.metrics.json)
   for ((i = ${#files[@]} - 1; i >= 0; i--)); do
-    [[ -f "${files[i]}" && "${files[i]}" != "$current" ]] || continue
+    [[ -f "${files[i]}" && "${files[i]}" < "$current" ]] || continue
     printf '%s\n' "${files[i]}"
     return 0
   done

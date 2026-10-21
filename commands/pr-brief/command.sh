@@ -24,15 +24,26 @@ if [[ "$MODE" != "daily" && "$MODE" != "weekly" ]]; then
   exit 2
 fi
 
+# GB_AS_OF=YYYY-MM-DD backfills the brief of that day (window, file names and
+# the date in the Slack title), e.g. after a run failed on a usage limit.
+if [[ -n "${GB_AS_OF:-}" ]]; then
+  if [[ ! "$GB_AS_OF" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "GB_AS_OF must be YYYY-MM-DD: $GB_AS_OF" >&2
+    exit 2
+  fi
+  DATE_TAG="${GB_AS_OF//-/}"
+else
+  DATE_TAG="$(date +%Y%m%d)"
+fi
+BRIEF_DATE="${DATE_TAG:0:4}/${DATE_TAG:4:2}/${DATE_TAG:6:2}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-DATE_TAG="$(date +%Y%m%d)"
 export GB_LOG="$OUTPUT_DIR/logs/pr-brief-${MODE}-${STAMP}.log"
 export GB_FAILURE_CONTEXT="github-brief pr-brief ($MODE)"   # read by gb::_on_exit
 gb::guard_runtime          # a hang must fail loudly, not wedge the schedule
                            # (and gb::_on_exit makes a fast death just as loud)
 
 read -r SINCE UNTIL <<<"$(gb::iso_window "$MODE")"
-gb::log "pr-brief $MODE  window: $SINCE .. $UNTIL"
+gb::log "pr-brief $MODE  window: $SINCE .. $UNTIL${GB_AS_OF:+  (backfill as of $GB_AS_OF)}"
 gb::log "repos: ${REPOS[*]}"
 
 # --- 0. connectivity --------------------------------------------------------
@@ -106,6 +117,7 @@ PROMPT="$(gb::render "$CMD_DIR/prompts/${MODE}.md" \
   "REPOS=$(gb::repos_lines)" \
   "BASE=$BASE_BRANCH" \
   "SINCE=$SINCE" \
+  "BRIEF_DATE=$BRIEF_DATE" \
   "UNTIL=$UNTIL" \
   "WINDOW=$(gb::window_label "$SINCE" "$UNTIL")" \
   "DATA_JSON=$BUNDLE" \
