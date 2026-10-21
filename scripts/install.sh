@@ -20,16 +20,22 @@ export GB_OUT="$OUTPUT_DIR"
 # launchd GUI jobs get a minimal PATH; include where claude/gh/python3 live.
 export GB_PATH_ENV="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# Unload everything first so a job dropped from the config (e.g. the hub server
-# after SERVE_AT_LOGIN is turned off) does not linger from a previous install.
+# Generate into a staging dir first: if that fails, the installed jobs are left
+# untouched instead of being unloaded with nothing to replace them.
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+labels="$(python3 "$GB_ROOT/scripts/gen_plists.py" "$STAGE")"
+
+# Unload everything so a job dropped from the config (e.g. the hub server after
+# SERVE_AT_LOGIN is turned off) does not linger from a previous install.
 for plist in "$AGENTS"/com.github-brief.*.plist; do
   [[ -e "$plist" ]] || continue
   launchctl bootout "gui/$(id -u)/$(basename "$plist" .plist)" 2>/dev/null || true
   rm -f "$plist"
 done
 
-labels="$(python3 "$GB_ROOT/scripts/gen_plists.py" "$AGENTS")"
 while IFS= read -r label; do
+  mv "$STAGE/$label.plist" "$AGENTS/$label.plist"
   launchctl bootstrap "gui/$(id -u)" "$AGENTS/$label.plist"
   echo "loaded: $label"
 done <<<"$labels"
