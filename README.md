@@ -77,7 +77,8 @@ GB_AS_OF=2026-01-20 ./bin/github-brief pr-brief daily
 ```
 
 The review queue is always the current one: GitHub has no history of who was
-asked to review what on a past day.
+asked to review what on a past day. A date that does not exist or lies in the
+future is rejected before anything is fetched or posted.
 
 ## Configuration
 

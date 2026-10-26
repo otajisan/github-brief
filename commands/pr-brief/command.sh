@@ -27,11 +27,16 @@ fi
 # GB_AS_OF=YYYY-MM-DD backfills the brief of that day (window, file names and
 # the date in the Slack title), e.g. after a run failed on a usage limit.
 if [[ -n "${GB_AS_OF:-}" ]]; then
-  if [[ ! "$GB_AS_OF" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-    echo "GB_AS_OF must be YYYY-MM-DD: $GB_AS_OF" >&2
+  if [[ ! "$GB_AS_OF" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] ||
+     ! python3 -c 'import datetime, sys; datetime.date.fromisoformat(sys.argv[1])' "$GB_AS_OF" 2>/dev/null; then
+    echo "GB_AS_OF must be a real date YYYY-MM-DD: $GB_AS_OF" >&2
     exit 2
   fi
   DATE_TAG="${GB_AS_OF//-/}"
+  if [[ "$DATE_TAG" > "$(date +%Y%m%d)" ]]; then
+    echo "GB_AS_OF is in the future: $GB_AS_OF" >&2
+    exit 2
+  fi
 else
   DATE_TAG="$(date +%Y%m%d)"
 fi
@@ -42,7 +47,9 @@ export GB_FAILURE_CONTEXT="github-brief pr-brief ($MODE)"   # read by gb::_on_ex
 gb::guard_runtime          # a hang must fail loudly, not wedge the schedule
                            # (and gb::_on_exit makes a fast death just as loud)
 
-read -r SINCE UNTIL <<<"$(gb::iso_window "$MODE")"
+# A failure inside "$(...)" fed to read does not trip set -e; check it here.
+WINDOW="$(gb::iso_window "$MODE")" || exit 1
+read -r SINCE UNTIL <<<"$WINDOW"
 gb::log "pr-brief $MODE  window: $SINCE .. $UNTIL${GB_AS_OF:+  (backfill as of $GB_AS_OF)}"
 gb::log "repos: ${REPOS[*]}"
 
