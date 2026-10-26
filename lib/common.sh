@@ -251,9 +251,11 @@ gb::_slack_send() {
   local resp
   if ! resp="$(curl -sS --max-time 30 -w $'\n%{http_code}' -X POST \
     -H 'Content-type: application/json' --data "$1" "$SLACK_WEBHOOK_URL" 2>&1)"; then
+    resp="${resp//"$SLACK_WEBHOOK_URL"/[redacted]}"
     printf 'curl error: %s\n' "$(gb::_plain "${resp%%$'\n'*}")" >&2
     return 1
   fi
+  resp="${resp//"$SLACK_WEBHOOK_URL"/[redacted]}"   # a proxy may echo the URL
   local code="${resp##*$'\n'}" body="${resp%$'\n'*}"
   [[ "$code" == "200" && "$body" == "ok" ]] && return 0
   printf 'HTTP %s: %s\n' "$(gb::_plain "$code")" "$(gb::_plain "$body")" >&2
@@ -285,7 +287,12 @@ gb::post_slack() {
 import json, sys
 print(json.dumps({"text": open(sys.argv[1], encoding="utf-8").read()}, ensure_ascii=False))
 PY
-)"
+)" || {
+    # Explicit: callers use `gb::post_slack … ||`, which disables set -e in here.
+    gb::log "slack: could not build the payload from $txt"
+    gb::notify_failure "${GB_FAILURE_CONTEXT:-github-brief}: Slack body could not be encoded ($txt). log: ${GB_LOG:-n/a}"
+    return 1
+  }
   if err="$(gb::_slack_send "$payload" 2>&1)"; then
     gb::log "slack: sent"
   else
