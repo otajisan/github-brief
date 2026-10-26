@@ -34,6 +34,13 @@ for plist in "$AGENTS"/com.github-brief.*.plist; do
   rm -f "$plist"
 done
 
+# From here on the old jobs are gone; say how to recover if a step fails.
+on_exit() {
+  local rc=$?
+  rm -rf "$STAGE"
+  [[ $rc -eq 0 ]] || echo "install.sh failed midway (exit $rc): some jobs may be unloaded — re-run ./scripts/install.sh" >&2
+}
+trap on_exit EXIT
 while IFS= read -r label; do
   mv "$STAGE/$label.plist" "$AGENTS/$label.plist"
   launchctl bootstrap "gui/$(id -u)" "$AGENTS/$label.plist"
