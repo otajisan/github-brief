@@ -67,6 +67,18 @@ chmod +x bin/github-brief scripts/*.sh
 launchctl kickstart -k gui/$(id -u)/com.github-brief.daily
 ```
 
+スケジュール実行が失敗した日(Claude の利用上限など)は、その日付を指定して
+後から作り直せます。集計期間・ファイル名・Slack の見出しは `GB_AS_OF` に従い、
+前期比はその前の日のブリーフと比べます:
+
+```bash
+GB_AS_OF=2026-01-20 ./bin/github-brief pr-brief daily
+```
+
+レビュー待ちの一覧は常に実行時点のものです(GitHub には「過去のある日に誰が
+レビューを依頼されていたか」の履歴がないため)。存在しない日付や未来の日付は、
+取得や投稿を始める前に弾きます。
+
 ## 設定
 
 環境固有の値はすべて `config.local.sh`(gitignore 済み)に置きます。主な設定:

@@ -8,7 +8,10 @@ Prints "SINCE UNTIL" as ISO8601 with a timezone offset, e.g.
   weekly  today START_HOUR:MINUTE minus LOOKBACK days .. today WEEKLY_HOUR:MINUTE
 
 usage: iso_window.py MODE TZ_OFFSET_HOURS LOOKBACK_DAYS \
-                     WEEKLY_HOUR WEEKLY_MINUTE START_HOUR START_MINUTE
+                     WEEKLY_HOUR WEEKLY_MINUTE START_HOUR START_MINUTE [AS_OF]
+
+AS_OF (YYYY-MM-DD) computes the window as if run on that day — used to
+backfill a brief whose scheduled run failed. Empty or absent means today.
 
 Kept as a file rather than a shell heredoc: bash materializes a here-document
 larger than the pipe buffer through a temp file, and that path can block on
@@ -51,13 +54,21 @@ def main() -> None:
         since, until = (datetime.fromisoformat(a) for a in sys.argv[2:4])
         print(label(since, until))
         return
-    if len(sys.argv) != 8:
-        raise SystemExit(f"usage: {sys.argv[0]} MODE TZ LOOKBACK WH WM SH SM")
+    if len(sys.argv) not in (8, 9):
+        raise SystemExit(f"usage: {sys.argv[0]} MODE TZ LOOKBACK WH WM SH SM [AS_OF]")
     mode = sys.argv[1]
     if mode not in ("daily", "weekly"):
         raise SystemExit(f"unknown mode: {mode}")
     tz_hours, lookback, wh, wm, sh, sm = (int(a) for a in sys.argv[2:8])
-    now = datetime.now(timezone(timedelta(hours=tz_hours)))
+    tz = timezone(timedelta(hours=tz_hours))
+    as_of = sys.argv[8] if len(sys.argv) == 9 else ""
+    if as_of:
+        try:
+            now = datetime.strptime(as_of, "%Y-%m-%d").replace(tzinfo=tz)
+        except ValueError:
+            raise SystemExit(f"invalid AS_OF (want YYYY-MM-DD): {as_of}")
+    else:
+        now = datetime.now(tz)
     since, until = window(mode, now, lookback, wh, wm, sh, sm)
     print(iso(since), iso(until))
 

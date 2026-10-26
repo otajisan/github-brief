@@ -48,7 +48,7 @@ inline CSS only, no external dependencies (no CDN, no web fonts).
 
 # Write Slack body to @@SLACK_TXT@@ (Write tool)
 Slack mrkdwn plain text:
-- Line 1: `*📋 PR日次ブリーフ（<今日の日付>）*`
+- Line 1: `*📋 PR日次ブリーフ（@@BRIEF_DATE@@）*`
 - Aggregated totals line from @@COUNTS@@: `レビュー待ち: N件 ／ 前日リリース: M件`
 - Then per repository a `*<owner/repo>*` heading followed by lines:
   `• <URL|#番号 タイトル> — 要約(短く1行)`  (review-queue group first, then released;
