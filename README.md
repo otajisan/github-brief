@@ -80,6 +80,7 @@ settings:
 | `REVIEW_FILTER` | `review-requested:@me` or `team-review-requested:ORG/TEAM` |
 | `SLACK_WEBHOOK_URL` | Incoming webhook; empty = HTML only |
 | `OUTPUT_DIR` | Where HTML/logs go (outside the repo) |
+| `SERVE_PORT` / `SERVE_AT_LOGIN` | Port of the history hub; `1` keeps it running from login (default `0`, see below) |
 | `MODEL` / `MAX_TURNS` | Model and per-run cost ceiling |
 | `RUN_TIMEOUT_SECONDS` | Wall-clock ceiling; a hung run is killed and reported to Slack (default 3600) |
 | `TZ_OFFSET_HOURS` | Timezone for windows (JST = 9) |
@@ -124,6 +125,20 @@ the repository. The committed tree contains no private data — safe to publish.
 `~/Library/LaunchAgents/`. launchd GUI jobs run with a minimal `PATH`, so the
 generated jobs set `PATH` to common Homebrew/system locations; if `claude`,
 `gh`, or `python3` live elsewhere, adjust `GB_PATH_ENV` in `scripts/install.sh`.
+
+With `SERVE_AT_LOGIN="1"`, install also registers `com.github-brief.serve`: it
+runs `scripts/serve.sh` at login and restarts it if it exits, so
+`http://localhost:SERVE_PORT/` keeps working after a reboot. Set it to `0` and
+re-run `install.sh` to remove it. `serve.sh` (also when started by hand) runs
+`lib/serve.py`, which listens on `127.0.0.1` only, refuses any `Host` other
+than `localhost` / `127.0.0.1`, serves only the `*.html` pages (`logs/` and the
+JSON sidecars are 404) and sends a CSP that blocks scripts and outbound
+requests.
+
+If the Slack webhook rejects a post (revoked URL, oversized message, …) the
+run logs `slack: send failed (HTTP <code>: <reason>)`, sends a warning, and
+exits 1 after writing the page — so it shows up as a failed launchd job even
+when the warning itself cannot be delivered.
 
 Uninstall:
 

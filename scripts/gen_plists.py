@@ -2,7 +2,8 @@
 """Generate macOS launchd plists for github-brief from config values.
 
 Reads settings from the environment (exported by install.sh after sourcing
-config.local.sh) and writes one plist per scheduled job into the target dir.
+config.local.sh) and writes one plist per job into the target dir, printing
+the label of every plist it wrote (install.sh loads exactly those).
 
 Add a new scheduled command by appending to JOBS below.
 """
@@ -14,6 +15,7 @@ target_dir = sys.argv[1]
 gb_bin = os.environ["GB_BIN"]
 path_env = os.environ["GB_PATH_ENV"]
 out = os.environ["GB_OUT"]
+serve_sh = os.environ["GB_SERVE"]
 
 
 def _int(name, default):
@@ -37,20 +39,46 @@ JOBS = {
 }
 
 
-def build(label, args, cal):
+# The one deliberate exception to the heartbeat rule: the history-hub server.
+# Started at login and restarted if it dies, so http://localhost:PORT/ survives
+# a reboot. Opt-in via SERVE_AT_LOGIN=1; it only serves OUTPUT_DIR on loopback.
+SERVE_LABEL = "com.github-brief.serve"
+
+
+def _base(label, program):
     return {
         "Label": label,
-        "ProgramArguments": ["/bin/bash", gb_bin, *args],
-        "StartCalendarInterval": cal,
+        "ProgramArguments": program,
         "EnvironmentVariables": {"PATH": path_env},
         "StandardOutPath": f"{out}/logs/{label}.out.log",
         "StandardErrorPath": f"{out}/logs/{label}.err.log",
+    }
+
+
+def build(label, args, cal):
+    return {
+        **_base(label, ["/bin/bash", gb_bin, *args]),
+        "StartCalendarInterval": cal,
         "RunAtLoad": False,
     }
 
 
-for label, (args, cal) in JOBS.items():
-    path = os.path.join(target_dir, f"{label}.plist")
-    with open(path, "wb") as f:
-        plistlib.dump(build(label, args, cal), f)
-    print(f"wrote {path}")
+def build_serve():
+    return {
+        **_base(SERVE_LABEL, ["/bin/bash", serve_sh]),
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        # A server that dies at once (port taken) is retried once a minute, not
+        # launchd's default every 10s.
+        "ThrottleInterval": 60,
+    }
+
+
+plists = {label: build(label, args, cal) for label, (args, cal) in JOBS.items()}
+if os.environ.get("SERVE_AT_LOGIN", "0") == "1":
+    plists[SERVE_LABEL] = build_serve()
+
+for label, plist in plists.items():
+    with open(os.path.join(target_dir, f"{label}.plist"), "wb") as f:
+        plistlib.dump(plist, f)
+    print(label)

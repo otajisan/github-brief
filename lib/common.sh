@@ -240,20 +240,65 @@ gb::rebuild_site() {
   python3 "$GB_ROOT/lib/build_site.py" index --output-dir "$OUTPUT_DIR"
 }
 
+# gb::_slack_send <json-payload>
+# POSTs to the webhook and succeeds only on HTTP 200 with body "ok". curl's own
+# exit status is not enough: a revoked webhook (403/404) or a rejected payload
+# (400 invalid_payload, msg_too_long, …) still exits 0. On failure the status
+# and the reason are printed to stderr; the URL never is. The reason is cut to
+# plain characters and 80 chars, because a proxy or captive portal can answer
+# with arbitrary HTML that would otherwise land in the Slack warning.
+gb::_slack_send() {
+  local resp
+  if ! resp="$(curl -sS --max-time 30 -w $'\n%{http_code}' -X POST \
+    -H 'Content-type: application/json' --data "$1" "$SLACK_WEBHOOK_URL" 2>&1)"; then
+    resp="${resp//"$SLACK_WEBHOOK_URL"/[redacted]}"
+    printf 'curl error: %s\n' "$(gb::_plain "${resp%%$'\n'*}")" >&2
+    return 1
+  fi
+  resp="${resp//"$SLACK_WEBHOOK_URL"/[redacted]}"   # a proxy may echo the URL
+  local code="${resp##*$'\n'}" body="${resp%$'\n'*}"
+  [[ "$code" == "200" && "$body" == "ok" ]] && return 0
+  printf 'HTTP %s: %s\n' "$(gb::_plain "$code")" "$(gb::_plain "$body")" >&2
+  return 1
+}
+
+# gb::_plain <text> -> text with anything but [A-Za-z0-9 _.:()/-] blanked, max 80 chars
+gb::_plain() {
+  local s="${1//[^A-Za-z0-9 _.:()\/-]/ }"
+  printf '%s' "${s:0:80}"
+}
+
+# gb::post_slack <file.txt>
+# Posts the brief. A missing body or a rejected post is a failure of the run's
+# main deliverable: it is logged, reported via gb::notify_failure (which reaches
+# Slack when only this one message was rejected, e.g. msg_too_long), and
+# returns 1 so the caller can fail the run — a revoked webhook then still shows
+# up as a failed launchd job even though no warning could be delivered.
 gb::post_slack() {
   local txt="$1"
   if [[ -z "${SLACK_WEBHOOK_URL:-}" ]]; then gb::log "slack: not configured, skipping"; return 0; fi
-  if [[ ! -f "$txt" ]]; then gb::log "slack: body missing ($txt)"; return 0; fi
-  local payload
+  if [[ ! -f "$txt" ]]; then
+    gb::log "slack: body missing ($txt)"
+    gb::notify_failure "${GB_FAILURE_CONTEXT:-github-brief}: Slack body was not generated ($txt). log: ${GB_LOG:-n/a}"
+    return 1
+  fi
+  local payload err
   payload="$(python3 - "$txt" <<'PY'
 import json, sys
 print(json.dumps({"text": open(sys.argv[1], encoding="utf-8").read()}, ensure_ascii=False))
 PY
-)"
-  if curl -s -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL" >/dev/null; then
+)" || {
+    # Explicit: callers use `gb::post_slack … ||`, which disables set -e in here.
+    gb::log "slack: could not build the payload from $txt"
+    gb::notify_failure "${GB_FAILURE_CONTEXT:-github-brief}: Slack body could not be encoded ($txt). log: ${GB_LOG:-n/a}"
+    return 1
+  }
+  if err="$(gb::_slack_send "$payload" 2>&1)"; then
     gb::log "slack: sent"
   else
-    gb::log "slack: send failed"
+    gb::log "slack: send failed ($err)"
+    gb::notify_failure "${GB_FAILURE_CONTEXT:-github-brief}: Slack post was rejected ($err). log: ${GB_LOG:-n/a}"
+    return 1
   fi
 }
 
@@ -270,6 +315,7 @@ gb::notify_failure() {
   [[ -n "${SLACK_WEBHOOK_URL:-}" ]] || return 0
   local payload
   payload="$(python3 -c 'import json,sys; print(json.dumps({"text": ":warning: " + sys.argv[1]}, ensure_ascii=False))' "$1")" || return 0
-  curl -s -X POST -H 'Content-type: application/json' \
-    --data "$payload" "$SLACK_WEBHOOK_URL" >/dev/null || true
+  local err
+  err="$(gb::_slack_send "$payload" 2>&1)" || gb::log "slack: warning not delivered ($err)"
+  return 0
 }

@@ -49,7 +49,7 @@ github-brief/
 │   ├── install.sh           # generate + load launchd jobs from config
 │   ├── uninstall.sh
 │   ├── gen_plists.py         # builds plists (extend JOBS to schedule new commands)
-│   └── serve.sh             # http://localhost:PORT/index.html
+│   └── serve.sh             # http://localhost:PORT/index.html (login item if SERVE_AT_LOGIN=1)
 ├── config.example.sh        # committed template (copy to config.local.sh)
 ├── docs/
 └── LICENSE

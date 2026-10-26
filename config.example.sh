@@ -31,6 +31,9 @@ export OUTPUT_DIR="$HOME/.local/share/github-brief"
 
 # Port used by scripts/serve.sh to view HTML at http://localhost:PORT/index.html
 export SERVE_PORT="8787"
+# Opt-in: 1 = scripts/install.sh also registers a login item that keeps serve.sh
+# running (loopback only), so the hub survives reboots. 0 = start serve.sh by hand.
+export SERVE_AT_LOGIN="0"
 
 # --- Claude Code ------------------------------------------------------------
 export MODEL="claude-sonnet-5"     # cost-first: claude-haiku-4-5 / quality: claude-opus-4-8

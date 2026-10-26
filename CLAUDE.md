@@ -28,7 +28,9 @@ cross links) so the weekly summary can be drilled down into the daily briefs.
 ## Design principles (rules to preserve)
 
 1. **Heartbeat loop.** launchd wakes a command on a schedule; it gathers data,
-   produces output, and exits. Nothing runs resident.
+   produces output, and exits. Nothing runs resident — the one exception is
+   the opt-in `com.github-brief.serve` login item (`SERVE_AT_LOGIN=1`), a
+   loopback-only static server for the history hub that does no work itself.
 2. **Deterministic vs fuzzy split.** Breakable logic — date-window math, `gh`
    search queries, JSON aggregation, every number in the output, chart markup,
    file I/O, Slack posting — lives in shell (`lib/common.sh`) and the `lib/*.py`
@@ -66,7 +68,7 @@ scripts/
   install.sh              # generate + bootstrap launchd jobs from config
   uninstall.sh            # bootout + remove plists
   gen_plists.py           # plist builder; JOBS dict maps label -> (args, schedule)
-  serve.sh                # serve OUTPUT_DIR at http://localhost:PORT/index.html
+  serve.sh                # serve OUTPUT_DIR at http://localhost:PORT/index.html (127.0.0.1)
 config.example.sh         # committed template (placeholders only)
 config.local.sh           # gitignored real config — never read values from it into committed files
 docs/                     # ARCHITECTURE.md, ADDING_A_COMMAND.md

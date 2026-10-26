@@ -6,5 +6,5 @@ GB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$GB_ROOT/lib/common.sh"
 gb::load_config
 PORT="${1:-${SERVE_PORT:-8787}}"
-echo "Serving $OUTPUT_DIR at http://localhost:$PORT/index.html"
-exec python3 -m http.server "$PORT" --directory "$OUTPUT_DIR"
+# lib/serve.py: loopback only, Host-checked, *.html only, no access log.
+exec python3 "$GB_ROOT/lib/serve.py" "$PORT" "$OUTPUT_DIR"

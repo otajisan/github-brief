@@ -48,7 +48,7 @@ github-brief/
 │   ├── install.sh           # 設定から launchd ジョブを生成・登録
 │   ├── uninstall.sh
 │   ├── gen_plists.py        # plist ビルダー(新コマンドのスケジュールは JOBS を拡張)
-│   └── serve.sh             # http://localhost:PORT/index.html
+│   └── serve.sh             # http://localhost:PORT/index.html (SERVE_AT_LOGIN=1 で常駐)
 ├── config.example.sh        # コミットされるテンプレート(config.local.sh にコピー)
 ├── docs/
 └── LICENSE
