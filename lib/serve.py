@@ -8,6 +8,9 @@ the com.github-brief.serve login item:
   machine — a DNS-rebinding page cannot read the briefs through the browser;
 - serves only the brief pages (*.html); logs/, the *.json sidecars (raw PR
   bodies) and directory listings are 404;
+- sends a CSP that forbids scripts and outbound requests, so a page the model
+  was tricked into writing (prompt injection via a PR body) cannot read the
+  other briefs and send them anywhere;
 - writes no per-request access log, so the launchd log does not grow forever.
 
 usage: serve.py <port> <directory>
@@ -19,6 +22,15 @@ import urllib.parse
 
 ALLOWED_HOSTS = ("localhost", "127.0.0.1")
 SERVED_SUFFIX = ".html"
+# Pages are self-contained HTML + inline CSS (see the prompt templates).
+SECURITY_HEADERS = (
+    ("Content-Security-Policy",
+     "default-src 'none'; style-src 'unsafe-inline'; img-src data:; "
+     "base-uri 'none'; form-action 'none'"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("Referrer-Policy", "no-referrer"),
+    ("Cache-Control", "no-store"),
+)
 
 
 class BriefHandler(http.server.SimpleHTTPRequestHandler):
@@ -30,7 +42,7 @@ class BriefHandler(http.server.SimpleHTTPRequestHandler):
         path = urllib.parse.unquote(self.path.split("?", 1)[0].split("#", 1)[0])
         if path == "/":
             self.path = "/index.html"
-        elif "/" in path[1:] or not path.endswith(SERVED_SUFFIX):
+        elif "/" in path[1:] or "\x00" in path or not path.endswith(SERVED_SUFFIX):
             self.send_error(404)
             return False
         return True
@@ -42,6 +54,11 @@ class BriefHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self) -> None:
         if self._allowed():
             super().do_HEAD()
+
+    def end_headers(self) -> None:
+        for name, value in SECURITY_HEADERS:
+            self.send_header(name, value)
+        super().end_headers()
 
     def list_directory(self, path: str) -> None:
         self.send_error(404)
